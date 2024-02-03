@@ -2,32 +2,45 @@ package cqkv
 
 import (
 	"fmt"
-	"github.com/cqkv/cqkv/codec"
 	"path/filepath"
 
+	"github.com/cqkv/cqkv/codec"
 	"github.com/cqkv/cqkv/fio"
+	"github.com/cqkv/cqkv/keydir"
+	"github.com/cqkv/cqkv/model"
 )
 
 type options struct {
 	dirPath      string
 	dataFileSize int64
+	// syncFre indicate the frequency to sync
+	syncFre int64
 
-	iOManagerCreator func(fid uint32) (fio.IOManager, error)
-	codec            codec.Codec
+	ioManagerCreator func(dirPath string, fid uint32) (fio.IOManager, error)
+	fileLock         fio.FileLocker
+
+	codec codec.Codec
+
+	keyDir keydir.Keydir
 }
 
 type Option func(*options)
 
-func WithIOManagerCreator(fn func(fid uint32) (fio.IOManager, error)) Option {
+// WithIOManagerCreator should be used with file lock
+func WithIOManagerCreator(fn func(dirPath string, fid uint32) (fio.IOManager, error)) Option {
 	return func(o *options) {
-		o.iOManagerCreator = fn
+		o.ioManagerCreator = fn
 	}
 }
 
-var dirPath string
+func WithFileLock(lock fio.FileLocker) Option {
+	return func(o *options) {
+		o.fileLock = lock
+	}
+}
 
-var defaultIOManagerCreator = func(fid uint32) (fio.IOManager, error) {
-	return fio.NewFIleIO(filepath.Join(dirPath, fmt.Sprintf("%09d", fid)))
+var defaultIOManagerCreator = func(dirPath string, fid uint32) (fio.IOManager, error) {
+	return fio.NewFIleIO(filepath.Join(dirPath, fmt.Sprintf("%09d%s", fid, model.DataFileSuffix)))
 }
 
 func WithDirPath(dirPath string) Option {
@@ -45,5 +58,17 @@ func WithDataFileSize(size int64) Option {
 func WithCodec(codec codec.Codec) Option {
 	return func(o *options) {
 		o.codec = codec
+	}
+}
+
+func WithBTreeKeydir(degree int) Option {
+	return func(o *options) {
+		o.keyDir = keydir.NewBTree(degree)
+	}
+}
+
+func WithSkipListKeydir() Option {
+	return func(o *options) {
+		o.keyDir = keydir.NewSkipList()
 	}
 }
