@@ -1,9 +1,11 @@
 package keydir
 
 import (
-	"github.com/cqkv/cqkv/model"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/cqkv/cqkv/model"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBTree_Put(t *testing.T) {
