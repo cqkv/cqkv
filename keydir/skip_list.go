@@ -3,6 +3,7 @@ package keydir
 import "github.com/cqkv/cqkv/model"
 
 // SkipList not implement
+// TODO
 type SkipList struct {
 }
 

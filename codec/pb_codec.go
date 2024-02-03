@@ -2,13 +2,18 @@ package codec
 
 import "github.com/cqkv/cqkv/model"
 
-type PbCode struct {
+// PbCodec TODO
+type PbCodec struct {
 }
 
-func (pc *PbCode) Marshal(*model.Record) ([]byte, error) {
-	return nil, nil
+func NewPbCodec() *PbCodec {
+	return nil
 }
 
-func (pc *PbCode) Unmarshal([]byte, *model.Record) error {
+func (pc *PbCodec) Marshal(*model.Record) ([]byte, int64) {
+	return nil, 0
+}
+
+func (pc *PbCodec) Unmarshal([]byte, *model.Record) error {
 	return nil
 }

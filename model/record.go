@@ -11,6 +11,6 @@ type Record struct {
 
 type RecordPos struct {
 	Fid    uint32 // file id
-	Size   uint32 // value size
+	Size   int64  // value size
 	Offset int64  // value position
 }

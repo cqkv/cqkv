@@ -7,3 +7,8 @@ type IOManager interface {
 	Sync() error
 	Close() error
 }
+
+type FileLocker interface {
+	TryLock() (bool, error)
+	Unlock() error
+}

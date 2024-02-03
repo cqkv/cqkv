@@ -10,6 +10,7 @@ import (
 
 // Keydir defined the keydir interface
 // you can use some other data structure once you implement this interface
+// keydir should be concurrency-safe!!!
 type Keydir interface {
 	Put(key []byte, value *model.RecordPos) bool
 	Get(key []byte) *model.RecordPos

@@ -40,7 +40,6 @@ func TestFIleIO_Read(t *testing.T) {
 }
 
 func TestFIleIO_Sync(t *testing.T) {
-
 }
 
 func TestFIleIO_Close(t *testing.T) {
