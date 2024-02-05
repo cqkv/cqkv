@@ -1,12 +1,22 @@
 package model
 
+import "encoding/binary"
+
+// record header: crc | isDelete | key size | value size
+// len:   		   4        1       max 5        max 5
+const maxHeaderSize = binary.MaxVarintLen32*2 + 5
+
+type RecordHeader struct {
+	Crc       uint32 // 4 bytes
+	KeySize   int64  // variable, max len = 5 bytes
+	ValueSize int64  // variable, max len = 5 bytes
+	IsDelete  bool   // 1 byte
+}
+
 type Record struct {
-	Crc       uint32
-	KeySize   uint32
-	ValueSize uint32
-	Key       []byte
-	Value     []byte
-	IsDelete  bool
+	Key      []byte
+	Value    []byte
+	IsDelete bool
 }
 
 type RecordPos struct {

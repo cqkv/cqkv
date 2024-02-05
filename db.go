@@ -1,6 +1,7 @@
 package cqkv
 
 import (
+	"github.com/cqkv/cqkv/utils"
 	"io"
 	"os"
 	"reflect"
@@ -186,7 +187,7 @@ func (db *DB) appendRecord(record *model.Record) (*model.RecordPos, error) {
 	}
 
 	// marshal record
-	data, size := db.options.codec.Marshal(record)
+	data, size := db.options.codec.MarshalRecord(record)
 	if size > db.options.dataFileSize {
 		return nil, ErrBigValue
 	}
@@ -242,7 +243,7 @@ func (db *DB) setActiveDatafile() error {
 	}
 
 	var err error
-	dataFile.IOManager, err = db.options.ioManagerCreator(db.options.dirPath, initialFileId)
+	dataFile.IoManager, err = db.options.ioManagerCreator(db.options.dirPath, initialFileId)
 	if err != nil {
 		return err
 	}
@@ -263,19 +264,55 @@ func (db *DB) get(pos *model.RecordPos) (*model.Record, error) {
 		return nil, ErrNoDataFile
 	}
 
-	// get primitive data
-	data, _, err := dataFile.ReadData(pos.Offset)
+	record, _, err := db.getRecord(dataFile, pos.Offset)
+	return record, err
+}
+
+func (db *DB) getRecord(dataFile *model.DataFile, offset int64) (*model.Record, int64, error) {
+	// get primitive header data
+	headerData, err := dataFile.ReadRecordHeader(offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	record := new(model.Record)
+	recordHeader := new(model.RecordHeader)
+	// unmarshal record header
+	headerSize, err := db.options.codec.UnmarshalRecordHeader(headerData, recordHeader)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// check header
+	if recordHeader == nil {
+		return nil, 0, io.EOF
+	}
+
+	if recordHeader.Crc == 0 && recordHeader.KeySize == 0 && recordHeader.ValueSize == 0 {
+		return nil, 0, io.EOF
+	}
+
+	// get primitive record data
+	keySize, valueSize := recordHeader.KeySize, recordHeader.ValueSize
+	kvSize := keySize + valueSize
+
+	data, err := dataFile.ReadRecord(offset+headerSize, kvSize)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	// unmarshal record
-	if err := db.options.codec.Unmarshal(data, record); err != nil {
-		return nil, err
+	record := new(model.Record)
+	if err = db.options.codec.UnmarshalRecord(data, recordHeader, record); err != nil {
+		return nil, 0, err
+	}
+	record.IsDelete = recordHeader.IsDelete
+
+	// check crc
+	if !utils.CheckCrc(recordHeader.Crc, append(headerData[4:], data[:]...)) {
+		return nil, 0, ErrWrongCrc
 	}
 
-	return record, nil
+	return record, headerSize + kvSize, nil
 }
 
 func (db *DB) loadDataFiles() error {
@@ -336,19 +373,19 @@ func (db *DB) loadKeydirFromDataFiles() error {
 			dataFile = db.olderFiles[fid]
 		}
 
+		if dataFile == nil {
+			return ErrNoDataFile
+		}
+
 		// read data file
 		var offset int64
 		for {
-			data, size, err := dataFile.ReadData(offset)
+			record, size, err := db.getRecord(dataFile, offset)
 			if err != nil {
 				if err == io.EOF {
 					break
 				}
 				return err
-			}
-			record := new(model.Record)
-			if err = db.options.codec.Unmarshal(data, record); err != nil {
-				return ErrDataFileCorrupted
 			}
 
 			// put pos into keydir
@@ -359,10 +396,14 @@ func (db *DB) loadKeydirFromDataFiles() error {
 			}
 
 			// record may be deleted
+			var ok bool
 			if record.IsDelete {
-				db.options.keyDir.Delete(record.Key)
+				ok = db.options.keyDir.Delete(record.Key)
 			} else {
-				db.options.keyDir.Put(record.Key, pos)
+				ok = db.options.keyDir.Put(record.Key, pos)
+			}
+			if !ok {
+				return ErrUpdateKeydir
 			}
 
 			// update offset

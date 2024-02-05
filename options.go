@@ -32,7 +32,7 @@ var defaultOptions = &options{
 	dataFileSize:     1024 * 1024 * 256, // 256mb
 	syncFre:          32,
 	ioManagerCreator: defaultIOManagerCreator,
-	codec:            codec.NewPbCodec(),
+	codec:            codec.NewCodecImpl(),
 	keyDir:           keydir.NewSkipList(),
 }
 

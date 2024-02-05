@@ -8,6 +8,7 @@ var (
 	ErrEmptyKey = addPrefix("the key is empty")
 	ErrBigValue = addPrefix("value is too big")
 	ErrNoRecord = addPrefix("no record in keydir")
+	ErrWrongCrc = addPrefix("wrong crc value, data may be corrupted")
 
 	ErrNoDataFile        = addPrefix("no data file")
 	ErrNoIOManager       = addPrefix("no io manager")

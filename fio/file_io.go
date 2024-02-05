@@ -27,3 +27,10 @@ func (fio *FileIO) Sync() error {
 func (fio *FileIO) Close() error {
 	return fio.fd.Close()
 }
+func (fio *FileIO) Size() (int64, error) {
+	info, err := fio.fd.Stat()
+	if err != nil {
+		return 0, err
+	}
+	return info.Size(), nil
+}

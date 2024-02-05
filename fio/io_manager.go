@@ -6,9 +6,5 @@ type IOManager interface {
 	Write([]byte) (int, error)
 	Sync() error
 	Close() error
-}
-
-type FileLocker interface {
-	TryLock() (bool, error)
-	Unlock() error
+	Size() (int64, error)
 }
