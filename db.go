@@ -9,9 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cqkv/cqkv/codec"
 	"github.com/cqkv/cqkv/fio"
-	"github.com/cqkv/cqkv/keydir"
 	"github.com/cqkv/cqkv/model"
 )
 
@@ -31,15 +29,11 @@ func Open(dirPath string, ops ...Option) (*DB, error) {
 }
 
 func newDB(dirPath string, o []Option) (*DB, error) {
-	ops := &options{
-		dirPath:          dirPath,
-		dataFileSize:     1024 * 1024,
-		syncFre:          32,
-		ioManagerCreator: defaultIOManagerCreator,
-		codec:            codec.NewPbCodec(),
-		keyDir:           keydir.NewSkipList(),
+	// create options
+	ops := defaultOptions
+	if dirPath != "" {
+		ops.dirPath = dirPath
 	}
-
 	fileLock := fio.NewFlock(dirPath)
 	ops.fileLock = fileLock
 
@@ -49,6 +43,7 @@ func newDB(dirPath string, o []Option) (*DB, error) {
 
 	// if ioManager is fio.FileIO, check dir
 	if reflect.ValueOf(ops.ioManagerCreator).Pointer() != reflect.ValueOf(defaultIOManagerCreator).Pointer() {
+		// check file lock
 		if ops.fileLock == fileLock {
 			return nil, ErrNeedFileLock
 		}
@@ -146,6 +141,36 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	return record.Value, nil
 }
 
+func (db *DB) Delete(key []byte) error {
+	if len(key) == 0 {
+		return nil
+	}
+
+	// if key is not in keydir, return
+	if pos := db.options.keyDir.Get(key); pos == nil {
+		return nil
+	}
+
+	// create record that isDelete is true
+	record := &model.Record{
+		Key:      key,
+		IsDelete: true,
+	}
+
+	// write to data file
+	if _, err := db.appendRecordWithLock(record); err != nil {
+		return err
+	}
+
+	// update keydir
+	ok := db.options.keyDir.Delete(key)
+	if !ok {
+		return ErrUpdateKeydir
+	}
+
+	return nil
+}
+
 func (db *DB) appendRecordWithLock(record *model.Record) (*model.RecordPos, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
@@ -195,7 +220,7 @@ func (db *DB) appendRecord(record *model.Record) (*model.RecordPos, error) {
 
 	pos := &model.RecordPos{
 		Fid:    db.activeFile.Fid,
-		Size:   size,
+		Size:   uint32(size),
 		Offset: writeOff,
 	}
 
@@ -278,7 +303,7 @@ func (db *DB) loadDataFiles() error {
 	sort.Slice(fileIds, func(i, j int) bool {
 		return fileIds[i] < fileIds[j]
 	})
-	db.fileIds = fileIds
+	db.fileIds = fileIds // only used in loading keydir
 
 	for i, id := range fileIds {
 		// get io manager
@@ -302,6 +327,7 @@ func (db *DB) loadKeydirFromDataFiles() error {
 		return nil
 	}
 
+	// get datafiles
 	for _, fid := range db.fileIds {
 		var dataFile *model.DataFile
 		if fid == db.activeFile.Fid {
@@ -310,6 +336,7 @@ func (db *DB) loadKeydirFromDataFiles() error {
 			dataFile = db.olderFiles[fid]
 		}
 
+		// read data file
 		var offset int64
 		for {
 			data, size, err := dataFile.ReadData(offset)
@@ -324,18 +351,21 @@ func (db *DB) loadKeydirFromDataFiles() error {
 				return ErrDataFileCorrupted
 			}
 
+			// put pos into keydir
 			pos := &model.RecordPos{
 				Fid:    fid,
-				Size:   size,
+				Size:   uint32(size),
 				Offset: offset,
 			}
 
+			// record may be deleted
 			if record.IsDelete {
 				db.options.keyDir.Delete(record.Key)
 			} else {
 				db.options.keyDir.Put(record.Key, pos)
 			}
 
+			// update offset
 			offset += size
 		}
 

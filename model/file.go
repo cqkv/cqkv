@@ -24,11 +24,13 @@ func (df *DataFile) Sync() error {
 	return nil
 }
 
+// Write binary data into file
 func (df *DataFile) Write(data []byte) error {
 	// TODO
 	return nil
 }
 
+// ReadData return the primitive data, data size and error
 func (df *DataFile) ReadData(off int64) ([]byte, int64, error) {
 	// TODO
 	return nil, 0, nil

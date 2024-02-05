@@ -2,6 +2,7 @@ package cqkv
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/cqkv/cqkv/codec"
@@ -22,6 +23,17 @@ type options struct {
 	codec codec.Codec
 
 	keyDir keydir.Keydir
+
+	fastOpen bool
+}
+
+var defaultOptions = &options{
+	dirPath:          os.TempDir(),
+	dataFileSize:     1024 * 1024 * 256, // 256mb
+	syncFre:          32,
+	ioManagerCreator: defaultIOManagerCreator,
+	codec:            codec.NewPbCodec(),
+	keyDir:           keydir.NewSkipList(),
 }
 
 type Option func(*options)
@@ -29,6 +41,9 @@ type Option func(*options)
 // WithIOManagerCreator should be used with file lock
 func WithIOManagerCreator(fn func(dirPath string, fid uint32) (fio.IOManager, error)) Option {
 	return func(o *options) {
+		if fn == nil {
+			panic(ErrNoIOManager)
+		}
 		o.ioManagerCreator = fn
 	}
 }
@@ -70,5 +85,12 @@ func WithBTreeKeydir(degree int) Option {
 func WithSkipListKeydir() Option {
 	return func(o *options) {
 		o.keyDir = keydir.NewSkipList()
+	}
+}
+
+// WithFastOpen use mmap to reduce open time
+func WithFastOpen() Option {
+	return func(o *options) {
+		o.fastOpen = true
 	}
 }
