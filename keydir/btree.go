@@ -1,6 +1,7 @@
 package keydir
 
 import (
+	"bytes"
 	"sync"
 
 	"github.com/cqkv/cqkv/model"
@@ -9,6 +10,8 @@ import (
 )
 
 var _ Keydir = (*BTree)(nil)
+
+const defaultDegree = 32
 
 // BTree implement the keydir
 type BTree struct {
@@ -19,7 +22,15 @@ type BTree struct {
 	lock *sync.RWMutex
 }
 
-const defaultDegree = 32
+// Item implement the btree.Item interface
+type Item struct {
+	key []byte
+	pos *model.RecordPos
+}
+
+func (i Item) Less(than btree.Item) bool {
+	return bytes.Compare(i.key, than.(*Item).key) == -1
+}
 
 func NewBTree(degree int) *BTree {
 	if degree <= 0 {

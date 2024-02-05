@@ -1,7 +1,6 @@
 package cqkv
 
 import (
-	"github.com/cqkv/cqkv/utils"
 	"io"
 	"os"
 	"reflect"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/cqkv/cqkv/fio"
 	"github.com/cqkv/cqkv/model"
+	"github.com/cqkv/cqkv/utils"
 )
 
 type DB struct {
