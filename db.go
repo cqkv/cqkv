@@ -1,6 +1,7 @@
 package cqkv
 
 import (
+	"encoding/binary"
 	"io"
 	"os"
 	"reflect"
@@ -187,38 +188,39 @@ func (db *DB) appendRecord(record *model.Record) (*model.RecordPos, error) {
 	}
 
 	// marshal record
-	data, size := db.options.codec.MarshalRecord(record)
-	if size > db.options.dataFileSize {
-		return nil, ErrBigValue
+	data, size, err := db.marshalRecord(record)
+	if err != nil {
+		return nil, err
 	}
 
 	// active file size + record size exceed the limit size
 	// close current active file, create a new active size
 	if db.activeFile.WriteOffset+size > db.options.dataFileSize {
 		// sync current active file data
-		if err := db.activeFile.Sync(); err != nil {
+		if err = db.activeFile.Sync(); err != nil {
 			return nil, err
 		}
 
-		if err := db.setActiveDatafile(); err != nil {
+		if err = db.setActiveDatafile(); err != nil {
 			return nil, err
 		}
 	}
 
 	// write data to file
 	writeOff := db.activeFile.WriteOffset
-	if err := db.activeFile.Write(data); err != nil {
+	if err = db.activeFile.Write(data); err != nil {
 		return nil, err
 	}
 
 	// check whether to sync
 	times := db.activeFile.WriteTimes
 	if times%db.options.syncFre == 0 {
-		if err := db.activeFile.Sync(); err != nil {
+		if err = db.activeFile.Sync(); err != nil {
 			return nil, err
 		}
 	}
 
+	// create record position
 	pos := &model.RecordPos{
 		Fid:    db.activeFile.Fid,
 		Size:   uint32(size),
@@ -226,6 +228,39 @@ func (db *DB) appendRecord(record *model.Record) (*model.RecordPos, error) {
 	}
 
 	return pos, nil
+}
+
+func (db *DB) marshalRecord(record *model.Record) ([]byte, int64, error) {
+	// create header
+	header := &model.RecordHeader{
+		IsDelete:  record.IsDelete,
+		KeySize:   int64(len(record.Key)),
+		ValueSize: int64(len(record.Value)),
+	}
+
+	// marshal header
+	headerData, headerSize, err := db.options.codec.MarshalRecordHeader(header)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// marshal record
+	recordData, recordSize, err := db.options.codec.MarshalRecord(record)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// merge header and record
+	size := headerSize + recordSize
+	data := make([]byte, size)
+	copy(data[:headerSize], headerData[:headerSize])
+	copy(data[headerSize:], recordData)
+
+	// generate crc
+	crc := utils.GenerateCrc(data[4:])
+	binary.BigEndian.PutUint32(data[:4], crc)
+
+	return data, size, nil
 }
 
 func (db *DB) setActiveDatafile() error {
@@ -264,11 +299,11 @@ func (db *DB) get(pos *model.RecordPos) (*model.Record, error) {
 		return nil, ErrNoDataFile
 	}
 
-	record, _, err := db.getRecord(dataFile, pos.Offset)
+	record, _, err := db.getRecordFromDataFile(dataFile, pos.Offset)
 	return record, err
 }
 
-func (db *DB) getRecord(dataFile *model.DataFile, offset int64) (*model.Record, int64, error) {
+func (db *DB) getRecordFromDataFile(dataFile *model.DataFile, offset int64) (*model.Record, int64, error) {
 	// get primitive header data
 	headerData, err := dataFile.ReadRecordHeader(offset)
 	if err != nil {
@@ -280,11 +315,6 @@ func (db *DB) getRecord(dataFile *model.DataFile, offset int64) (*model.Record, 
 	headerSize, err := db.options.codec.UnmarshalRecordHeader(headerData, recordHeader)
 	if err != nil {
 		return nil, 0, err
-	}
-
-	// check header
-	if recordHeader == nil {
-		return nil, 0, io.EOF
 	}
 
 	if recordHeader.Crc == 0 && recordHeader.KeySize == 0 && recordHeader.ValueSize == 0 {
@@ -316,6 +346,7 @@ func (db *DB) getRecord(dataFile *model.DataFile, offset int64) (*model.Record, 
 }
 
 func (db *DB) loadDataFiles() error {
+	// TODO: optimize to support various storage instance
 	dir := db.options.dirPath
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -380,7 +411,7 @@ func (db *DB) loadKeydirFromDataFiles() error {
 		// read data file
 		var offset int64
 		for {
-			record, size, err := db.getRecord(dataFile, offset)
+			record, size, err := db.getRecordFromDataFile(dataFile, offset)
 			if err != nil {
 				if err == io.EOF {
 					break

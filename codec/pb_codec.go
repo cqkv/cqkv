@@ -10,10 +10,10 @@ func NewPbCodec() *PbCodec {
 	return nil
 }
 
-func (pc *PbCodec) Marshal(*model.Record) ([]byte, int64) {
+func (pc *PbCodec) MarshalRecord(*model.Record) ([]byte, int64) {
 	return nil, 0
 }
 
-func (pc *PbCodec) Unmarshal([]byte, *model.Record) error {
+func (pc *PbCodec) UnmarshalRecord([]byte, *model.Record) error {
 	return nil
 }

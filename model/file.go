@@ -41,7 +41,7 @@ func (df *DataFile) ReadRecordHeader(offset int64) ([]byte, error) {
 		return nil, err
 	}
 
-	var headerBuf int64 = maxHeaderSize
+	var headerBuf int64 = MaxHeaderSize
 	if headerBuf+offset > fileSize {
 		headerBuf = fileSize - offset
 	}

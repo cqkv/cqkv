@@ -4,7 +4,8 @@ import "encoding/binary"
 
 // record header: crc | isDelete | key size | value size
 // len:   		   4        1       max 5        max 5
-const maxHeaderSize = binary.MaxVarintLen32*2 + 5
+
+const MaxHeaderSize = binary.MaxVarintLen32*2 + 5
 
 type RecordHeader struct {
 	Crc       uint32 // 4 bytes

@@ -8,35 +8,27 @@ import (
 
 func TestFIleIO_Write(t *testing.T) {
 	fio, err := NewFIleIO("./data")
-	if err != nil {
-		assert.Error(t, err, "new file io manager failed")
-	}
+	assert.Nil(t, err)
+	assert.NotNil(t, fio)
 
-	n, err := fio.Write([]byte("hello"))
-	if err != nil {
-		assert.Error(t, err, "fail to write data")
-	}
-	assert.Equal(t, int(5), n)
+	n, err := fio.fd.Write([]byte("hello"))
+	assert.Nil(t, err)
+	assert.Equal(t, 5, n)
 }
 
 func TestFIleIO_Read(t *testing.T) {
 	fio, err := NewFIleIO("./data")
-	if err != nil {
-		assert.Error(t, err, "new file io manager failed")
-	}
+	assert.Nil(t, err)
+	assert.NotNil(t, fio)
 
 	n, err := fio.Write([]byte("hello"))
-	if err != nil {
-		assert.Error(t, err, "fail to write data")
-	}
-	assert.Equal(t, int(5), n)
+	assert.Nil(t, err)
+	assert.Equal(t, 5, n)
 
 	buf := make([]byte, 5)
 	n, err = fio.Read(buf, 0)
-	if err != nil {
-		assert.Error(t, err, "fail to read data")
-	}
-	assert.Equal(t, int(5), n)
+	assert.Nil(t, err)
+	assert.Equal(t, 5, n)
 }
 
 func TestFIleIO_Sync(t *testing.T) {
