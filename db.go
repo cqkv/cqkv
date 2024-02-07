@@ -173,6 +173,28 @@ func (db *DB) Delete(key []byte) error {
 	return nil
 }
 
+func (db *DB) Close() error {
+	defer func() {
+		_ = db.options.fileLock.Unlock()
+	}()
+
+	if db.activeFile == nil {
+		return nil
+	}
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	for _, dataFile := range db.olderFiles {
+		if err := dataFile.Close(); err != nil {
+			return err
+		}
+	}
+	if err := db.activeFile.Close(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (db *DB) appendRecordWithLock(record *model.Record) (*model.RecordPos, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
@@ -193,14 +215,15 @@ func (db *DB) appendRecord(record *model.Record) (*model.RecordPos, error) {
 		return nil, err
 	}
 
+	// value is too big
+	if size > db.options.dataFileSize {
+		return nil, ErrBigValue
+	}
+
 	// active file size + record size exceed the limit size
 	// close current active file, create a new active size
 	if db.activeFile.WriteOffset+size > db.options.dataFileSize {
-		// sync current active file data
-		if err = db.activeFile.Sync(); err != nil {
-			return nil, err
-		}
-
+		// set new	active data file
 		if err = db.setActiveDatafile(); err != nil {
 			return nil, err
 		}
@@ -270,6 +293,10 @@ func (db *DB) setActiveDatafile() error {
 	if oldActiveFile != nil {
 		initialFileId = oldActiveFile.Fid + 1
 		// save old data file
+		// old data file is read only, sync to disk first
+		if err := oldActiveFile.Sync(); err != nil {
+			return err
+		}
 		db.olderFiles[oldActiveFile.Fid] = oldActiveFile
 	}
 
@@ -338,7 +365,7 @@ func (db *DB) getRecordFromDataFile(dataFile *model.DataFile, offset int64) (*mo
 	record.IsDelete = recordHeader.IsDelete
 
 	// check crc
-	if !utils.CheckCrc(recordHeader.Crc, append(headerData[4:], data[:]...)) {
+	if !utils.CheckCrc(recordHeader.Crc, append(headerData[4:headerSize], data[:]...)) {
 		return nil, 0, ErrWrongCrc
 	}
 
