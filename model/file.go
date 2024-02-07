@@ -61,3 +61,7 @@ func (df *DataFile) readNBytes(offset, n int64) ([]byte, error) {
 	}
 	return buf, nil
 }
+
+func (df *DataFile) Close() error {
+	return df.IoManager.Close()
+}
