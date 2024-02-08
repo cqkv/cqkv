@@ -195,6 +195,32 @@ func (db *DB) Close() error {
 	return nil
 }
 
+func (db *DB) Sync() error {
+	if db.activeFile == nil {
+		return nil
+	}
+
+	// sync active data file
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	return db.activeFile.Sync()
+}
+
+func (db *DB) ListKey() ([][]byte, error) {
+	// TODO
+	return nil, nil
+}
+
+func (db *DB) Fold(handler func(key, value []byte) error) error {
+	// TODO
+	return nil
+}
+
+func (db *DB) Merge() error {
+	// TODO
+	return nil
+}
+
 func (db *DB) appendRecordWithLock(record *model.Record) (*model.RecordPos, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
