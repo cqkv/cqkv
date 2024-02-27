@@ -2,6 +2,7 @@ package model
 
 import "encoding/binary"
 
+// TODO: change isDelete to record type to support more types of records, such as transaction record
 // record header: crc | isDelete | key size | value size
 // len:   		   4        1       max 5        max 5
 

@@ -1,6 +1,7 @@
 package cqkv
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 	"os"
@@ -21,6 +22,8 @@ type DB struct {
 	activeFile *model.DataFile            // data will append to active data file
 	olderFiles map[uint32]*model.DataFile // older files, read only
 	fileIds    []uint32                   // only used in loading keydir
+
+	txSeq uint64 // transaction sequence number
 
 	options *options
 }
@@ -100,7 +103,7 @@ func (db *DB) Put(key []byte, value []byte) error {
 
 	// append record in active data file
 	record := &model.Record{
-		Key:   key,
+		Key:   addTxSeqPrefix(key, noTransactionSeq),
 		Value: value,
 	}
 	pos, err := db.appendRecordWithLock(record)
@@ -475,6 +478,11 @@ func (db *DB) loadKeydirFromDataFiles() error {
 		return nil
 	}
 
+	// maybe some transactions are not committed
+	// store transaction records temporarily
+	transactionRecords := make(map[uint64]*model.Record)
+	curTxSeq := noTransactionSeq
+
 	// get datafiles
 	for _, fid := range db.fileIds {
 		var dataFile *model.DataFile
@@ -506,15 +514,46 @@ func (db *DB) loadKeydirFromDataFiles() error {
 				Offset: offset,
 			}
 
-			// record may be deleted
-			var ok bool
-			if record.IsDelete {
-				ok = db.options.keyDir.Delete(record.Key)
+			realKey, txSeq := parseTxSeqPrefix(record.Key)
+			// normal record
+			if txSeq == noTransactionSeq {
+				// record may be deleted
+				var ok bool
+				if record.IsDelete {
+					ok = db.options.keyDir.Delete(record.Key)
+				} else {
+					ok = db.options.keyDir.Put(record.Key, pos)
+				}
+				if !ok {
+					return ErrUpdateKeydir
+				}
 			} else {
-				ok = db.options.keyDir.Put(record.Key, pos)
+				// transaction record
+				// read the transaction finished record
+				// update keydir
+				if bytes.Compare(realKey, txFinishKey) == 0 {
+					for _, txRecord := range transactionRecords {
+						// record may be deleted
+						var ok bool
+						if txRecord.IsDelete {
+							ok = db.options.keyDir.Delete(txRecord.Key)
+						} else {
+							ok = db.options.keyDir.Put(txRecord.Key, pos)
+						}
+						if !ok {
+							return ErrUpdateKeydir
+						}
+					}
+					delete(transactionRecords, txSeq)
+				} else {
+					// store transaction record temporarily
+					transactionRecords[txSeq] = record
+				}
 			}
-			if !ok {
-				return ErrUpdateKeydir
+
+			// update transaction sequence number
+			if txSeq > curTxSeq {
+				curTxSeq = txSeq
 			}
 
 			// update offset
@@ -526,6 +565,8 @@ func (db *DB) loadKeydirFromDataFiles() error {
 			db.activeFile.WriteOffset = offset
 		}
 	}
+
+	db.txSeq = curTxSeq
 
 	return nil
 }

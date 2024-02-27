@@ -17,6 +17,8 @@ var (
 	ErrDataFileCorrupted = addPrefix("data file may be corrupted")
 
 	ErrUpdateKeydir = addPrefix("update keydir failed")
+
+	ErrExceedMaxBatchNum = addPrefix("exceed max batch num")
 )
 
 func addPrefix(errStr string) error {

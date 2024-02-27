@@ -94,3 +94,29 @@ func WithFastOpen() Option {
 		o.fastOpen = true
 	}
 }
+
+type WriteBatchOption func(*writeBatchOptions)
+
+type writeBatchOptions struct {
+	maxBatchNum int
+
+	// sync indicate whether to sync after write
+	sync bool
+}
+
+var defaultWriteBatchOptions = &writeBatchOptions{
+	maxBatchNum: 1024,
+	sync:        false,
+}
+
+func WithMaxBatchNum(num int) WriteBatchOption {
+	return func(o *writeBatchOptions) {
+		o.maxBatchNum = num
+	}
+}
+
+func WithSync(sync bool) WriteBatchOption {
+	return func(o *writeBatchOptions) {
+		o.sync = sync
+	}
+}
