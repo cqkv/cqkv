@@ -33,7 +33,7 @@ var defaultOptions = &options{
 	syncFre:          32,
 	ioManagerCreator: defaultIOManagerCreator,
 	codec:            codec.NewCodecImpl(),
-	keyDir:           keydir.NewSkipList(),
+	keyDir:           keydir.NewBTree(32),
 }
 
 type Option func(*options)

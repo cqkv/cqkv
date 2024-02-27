@@ -153,3 +153,44 @@ func TestDBOpenWithFiles(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "value1", string(value))
 }
+
+func TestDB_ListKey(t *testing.T) {
+	db, err := Open("./tmp/")
+	defer func() {
+		_ = os.RemoveAll("./tmp/")
+	}()
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	err = db.Put([]byte("key1"), []byte("value1"))
+	assert.Nil(t, err)
+
+	err = db.Put([]byte("key2"), []byte("value2"))
+	assert.Nil(t, err)
+
+	keys := db.ListKey()
+	assert.Equal(t, 2, len(keys))
+	assert.Equal(t, "key1", string(keys[0]))
+	assert.Equal(t, "key2", string(keys[1]))
+}
+
+func TestDB_Fold(t *testing.T) {
+	db, err := Open("./tmp/")
+	defer func() {
+		_ = os.RemoveAll("./tmp/")
+	}()
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	err = db.Put([]byte("key1"), []byte("value1"))
+	assert.Nil(t, err)
+
+	err = db.Put([]byte("key2"), []byte("value2"))
+	assert.Nil(t, err)
+
+	err = db.Fold(func(key, value []byte) error {
+		t.Log(string(key), string(value))
+		return nil
+	})
+	assert.Nil(t, err)
+}

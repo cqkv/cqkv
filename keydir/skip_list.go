@@ -5,6 +5,7 @@ import "github.com/cqkv/cqkv/model"
 // SkipList not implement
 // TODO
 type SkipList struct {
+	len int
 }
 
 func NewSkipList() *SkipList {
@@ -21,4 +22,12 @@ func (sl *SkipList) Get(key []byte) *model.RecordPos {
 
 func (sl *SkipList) Delete(key []byte) bool {
 	return true
+}
+
+func (sl *SkipList) Iterator() Iterator {
+	return nil
+}
+
+func (sl *SkipList) Size() int {
+	return sl.len
 }

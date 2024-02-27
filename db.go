@@ -206,13 +206,40 @@ func (db *DB) Sync() error {
 	return db.activeFile.Sync()
 }
 
-func (db *DB) ListKey() ([][]byte, error) {
-	// TODO
-	return nil, nil
+func (db *DB) ListKey() [][]byte {
+	// get iterator
+	iterator := db.options.keyDir.Iterator()
+	defer iterator.Close()
+
+	keys := make([][]byte, 0, db.options.keyDir.Size())
+	// iterate keydir
+	for iterator.Rewind(); iterator.Valid(); iterator.Next() {
+		keys = append(keys, iterator.Key())
+	}
+
+	return keys
 }
 
 func (db *DB) Fold(handler func(key, value []byte) error) error {
-	// TODO
+	// get iterator
+	iterator := db.options.keyDir.Iterator()
+	defer iterator.Close()
+
+	// iterate keydir
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	for iterator.Rewind(); iterator.Valid(); iterator.Next() {
+		key := iterator.Key()
+		pos := iterator.Value()
+		record, err := db.get(pos)
+		if err != nil {
+			return err
+		}
+
+		if err = handler(key, record.Value); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

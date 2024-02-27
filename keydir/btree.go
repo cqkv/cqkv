@@ -73,3 +73,58 @@ func (bt *BTree) Delete(key []byte) bool {
 	bt.lock.Unlock()
 	return res != nil
 }
+
+func (bt *BTree) Size() int {
+	return bt.tree.Len()
+}
+
+func (bt *BTree) Iterator() Iterator {
+	return bt.newBtreeIterator()
+}
+
+type btreeIterator struct {
+	values []*Item
+	curIdx int
+}
+
+func (bt *BTree) newBtreeIterator() *btreeIterator {
+	iterator := &btreeIterator{
+		values: make([]*Item, bt.tree.Len()),
+		curIdx: 0,
+	}
+
+	var idx int
+	getValues := func(item btree.Item) bool {
+		iterator.values[idx] = item.(*Item)
+		idx++
+		return true
+	}
+
+	bt.tree.Ascend(getValues)
+
+	return iterator
+}
+
+func (bti *btreeIterator) Rewind() {
+	bti.curIdx = 0
+}
+
+func (bti *btreeIterator) Next() {
+	bti.curIdx++
+}
+
+func (bti *btreeIterator) Valid() bool {
+	return bti.curIdx < len(bti.values)
+}
+
+func (bti *btreeIterator) Key() []byte {
+	return bti.values[bti.curIdx].key
+}
+
+func (bti *btreeIterator) Value() *model.RecordPos {
+	return bti.values[bti.curIdx].pos
+}
+
+func (bti *btreeIterator) Close() {
+
+}
