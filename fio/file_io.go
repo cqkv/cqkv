@@ -1,6 +1,8 @@
 package fio
 
-import "os"
+import (
+	"os"
+)
 
 // FileIO is the default implement for IOManager
 type FileIO struct {
@@ -8,7 +10,7 @@ type FileIO struct {
 }
 
 func NewFIleIO(file string) (*FileIO, error) {
-	fd, err := os.OpenFile(file, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0644)
+	fd, err := os.OpenFile(file, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
 		return nil, err
 	}

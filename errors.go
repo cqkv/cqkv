@@ -18,6 +18,9 @@ var (
 
 	ErrUpdateKeydir = addPrefix("update keydir failed")
 
+	ErrMergeIsProgress          = addPrefix("merge is in progress")
+	ErrInvalidMergeFinishedFile = addPrefix("invalid merge finished file")
+
 	ErrExceedMaxBatchNum = addPrefix("exceed max batch num")
 )
 

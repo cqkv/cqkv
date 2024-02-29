@@ -31,3 +31,7 @@ func (sl *SkipList) Iterator() Iterator {
 func (sl *SkipList) Size() int {
 	return sl.len
 }
+
+func (sl *SkipList) Close() error {
+	return nil
+}

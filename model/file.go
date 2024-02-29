@@ -1,9 +1,19 @@
 package model
 
-import "github.com/cqkv/cqkv/fio"
+import (
+	"fmt"
+	"github.com/cqkv/cqkv/fio"
+	"path/filepath"
+)
 
 const (
-	DataFileSuffix = ".cq"
+	DataFileType          = "data"
+	HintFileType          = "hint"
+	MergeFinishedFileType = "merge-finished"
+
+	DataFileSuffix        = ".cq"
+	HintFileSuffix        = ".hint"
+	MergeFinishedFileName = "cqkv-merge-finished"
 )
 
 type DataFile struct {
@@ -18,6 +28,19 @@ func OpenDataFile(fid uint32, ioManager fio.IOManager) *DataFile {
 		Fid:       fid,
 		IoManager: ioManager,
 	}
+}
+
+func GetDataFileName(dirPath, fileType string, fid uint32) string {
+	var filePath string
+	switch fileType {
+	case DataFileType:
+		filePath = filepath.Join(dirPath, fmt.Sprintf("%09d%s", fid, DataFileSuffix))
+	case HintFileType:
+		filePath = filepath.Join(dirPath, fmt.Sprintf("cqkv%s", HintFileSuffix))
+	case MergeFinishedFileType:
+		filePath = filepath.Join(dirPath, MergeFinishedFileName)
+	}
+	return filePath
 }
 
 func (df *DataFile) Sync() error {

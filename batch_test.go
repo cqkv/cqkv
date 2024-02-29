@@ -98,12 +98,12 @@ func TestWriteBatchP(t *testing.T) {
 		assert.Nil(t, err)
 	}
 
-	keys := db.ListKey()
+	keys := db.ListKeys()
 	assert.Equal(t, 0, len(keys))
 
 	err = wb.Commit()
 	assert.Nil(t, err)
 
-	keys = db.ListKey()
+	keys = db.ListKeys()
 	assert.Equal(t, 1000, len(keys))
 }

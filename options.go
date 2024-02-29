@@ -1,14 +1,10 @@
 package cqkv
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
-
 	"github.com/cqkv/cqkv/codec"
 	"github.com/cqkv/cqkv/fio"
 	"github.com/cqkv/cqkv/keydir"
-	"github.com/cqkv/cqkv/model"
+	"os"
 )
 
 type options struct {
@@ -17,12 +13,14 @@ type options struct {
 	// syncFre indicate the frequency to sync
 	syncFre int64
 
-	ioManagerCreator func(dirPath string, fid uint32) (fio.IOManager, error)
+	ioManagerCreator func(filePath string) (fio.IOManager, error)
 	fileLock         fio.FileLocker
 
 	codec codec.Codec
 
-	keyDir keydir.Keydir
+	keydir      keydir.Keydir
+	keydirType  string
+	btreeDegree int
 
 	fastOpen bool
 }
@@ -30,16 +28,18 @@ type options struct {
 var defaultOptions = &options{
 	dirPath:          os.TempDir(),
 	dataFileSize:     1024 * 1024 * 256, // 256mb
-	syncFre:          32,
+	syncFre:          101,
 	ioManagerCreator: defaultIOManagerCreator,
 	codec:            codec.NewCodecImpl(),
-	keyDir:           keydir.NewBTree(32),
+	keydir:           keydir.NewBTree(32),
+	keydirType:       keydir.BtreeTypeKeydir,
+	btreeDegree:      32,
 }
 
 type Option func(*options)
 
 // WithIOManagerCreator should be used with file lock
-func WithIOManagerCreator(fn func(dirPath string, fid uint32) (fio.IOManager, error)) Option {
+func WithIOManagerCreator(fn func(filePath string) (fio.IOManager, error)) Option {
 	return func(o *options) {
 		if fn == nil {
 			panic(ErrNoIOManager)
@@ -54,8 +54,8 @@ func WithFileLock(lock fio.FileLocker) Option {
 	}
 }
 
-var defaultIOManagerCreator = func(dirPath string, fid uint32) (fio.IOManager, error) {
-	return fio.NewFIleIO(filepath.Join(dirPath, fmt.Sprintf("%09d%s", fid, model.DataFileSuffix)))
+var defaultIOManagerCreator = func(filePath string) (fio.IOManager, error) {
+	return fio.NewFIleIO(filePath)
 }
 
 func WithDirPath(dirPath string) Option {
@@ -78,13 +78,16 @@ func WithCodec(codec codec.Codec) Option {
 
 func WithBTreeKeydir(degree int) Option {
 	return func(o *options) {
-		o.keyDir = keydir.NewBTree(degree)
+		o.keydir = keydir.NewBTree(degree)
+		o.keydirType = keydir.BtreeTypeKeydir
+		o.btreeDegree = degree
 	}
 }
 
 func WithSkipListKeydir() Option {
 	return func(o *options) {
-		o.keyDir = keydir.NewSkipList()
+		o.keydir = keydir.NewSkipList()
+		o.keydirType = keydir.SkipListTypeKeydir
 	}
 }
 

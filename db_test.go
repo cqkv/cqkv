@@ -1,6 +1,7 @@
 package cqkv
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"reflect"
@@ -28,17 +29,46 @@ func TestDB_Put(t *testing.T) {
 
 	err = db.Put([]byte("key"), []byte("value"))
 	assert.Nil(t, err)
-	pos := db.options.keyDir.Get([]byte("key"))
+	pos := db.options.keydir.Get([]byte("key"))
 	assert.NotNil(t, pos)
 
 	err = db.Put([]byte("key2"), []byte("value2"))
-	pos = db.options.keyDir.Get([]byte("key"))
+	pos = db.options.keydir.Get([]byte("key"))
 	assert.NotNil(t, pos)
 
 	err = db.Put([]byte("key"), []byte("value1"))
 	assert.Nil(t, err)
-	pos = db.options.keyDir.Get([]byte("key"))
+	pos = db.options.keydir.Get([]byte("key"))
 	assert.NotNil(t, pos)
+}
+
+func TestDB_Put2(t *testing.T) {
+	db, err := Open("./tmp/")
+	defer func() {
+		_ = os.RemoveAll("./tmp/")
+	}()
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	for i := 0; i < 1000; i++ {
+		err = db.Put([]byte(fmt.Sprintf("key%d", i)), []byte(fmt.Sprintf("value%d", i)))
+		assert.Nil(t, err)
+	}
+
+	//f, err := os.OpenFile("./data", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//defer f.Close()
+	//data := make([]byte, 20)
+	//for i := 0; i < 1000; i++ {
+	//	start := time.Now()
+	//	_, err = f.Write(data)
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	fmt.Println(time.Since(start))
+	//}
 }
 
 func TestDB_Get(t *testing.T) {
@@ -103,20 +133,27 @@ func TestDB_Close(t *testing.T) {
 
 	err = db.Put([]byte("key"), []byte("value"))
 	assert.Nil(t, err)
-	pos := db.options.keyDir.Get([]byte("key"))
+	pos := db.options.keydir.Get([]byte("key"))
 	assert.NotNil(t, pos)
 
 	err = db.Put([]byte("key2"), []byte("value2"))
-	pos = db.options.keyDir.Get([]byte("key"))
+	pos = db.options.keydir.Get([]byte("key"))
 	assert.NotNil(t, pos)
 
 	err = db.Put([]byte("key"), []byte("value1"))
 	assert.Nil(t, err)
-	pos = db.options.keyDir.Get([]byte("key"))
+	pos = db.options.keydir.Get([]byte("key"))
 	assert.NotNil(t, pos)
 
 	err = db.Close()
 	assert.Nil(t, err)
+
+	db, err = Open("./tmp/")
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	value, err := db.Get([]byte("key"))
+	assert.Equal(t, "value1", string(value))
 }
 
 func TestDBOpenWithFiles(t *testing.T) {
@@ -130,16 +167,16 @@ func TestDBOpenWithFiles(t *testing.T) {
 
 	err = db.Put([]byte("key"), []byte("value"))
 	assert.Nil(t, err)
-	pos := db.options.keyDir.Get([]byte("key"))
+	pos := db.options.keydir.Get([]byte("key"))
 	assert.NotNil(t, pos)
 
 	err = db.Put([]byte("key2"), []byte("value2"))
-	pos = db.options.keyDir.Get([]byte("key"))
+	pos = db.options.keydir.Get([]byte("key"))
 	assert.NotNil(t, pos)
 
 	err = db.Put([]byte("key"), []byte("value1"))
 	assert.Nil(t, err)
-	pos = db.options.keyDir.Get([]byte("key"))
+	pos = db.options.keydir.Get([]byte("key"))
 	assert.NotNil(t, pos)
 
 	err = db.Close()
@@ -168,7 +205,7 @@ func TestDB_ListKey(t *testing.T) {
 	err = db.Put([]byte("key2"), []byte("value2"))
 	assert.Nil(t, err)
 
-	keys := db.ListKey()
+	keys := db.ListKeys()
 	assert.Equal(t, 2, len(keys))
 	assert.Equal(t, "key1", string(keys[0]))
 	assert.Equal(t, "key2", string(keys[1]))
@@ -193,4 +230,55 @@ func TestDB_Fold(t *testing.T) {
 		return nil
 	})
 	assert.Nil(t, err)
+}
+
+func TestDB_Close2(t *testing.T) {
+	db, err := Open("./tmp/")
+	defer func() {
+		_ = os.RemoveAll("./tmp/")
+	}()
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	for i := 0; i < 50; i++ {
+		err = db.Put([]byte(fmt.Sprintf("key-%v", i)), []byte(fmt.Sprintf("value-%v", i)))
+		assert.Nil(t, err)
+	}
+
+	for i := 0; i < 25; i++ {
+		err = db.Delete([]byte(fmt.Sprintf("key-%v", i)))
+		assert.Nil(t, err)
+	}
+
+	err = db.Close()
+	assert.Nil(t, err)
+
+	db, err = Open("./tmp/")
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	keys := db.ListKeys()
+	assert.Equal(t, 25, len(keys))
+}
+
+func Test(t *testing.T) {
+	db, err := Open("./tmp/")
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+
+	v, err := db.Get([]byte("key6"))
+	if err != nil {
+		t.Log(err)
+	}
+	t.Log(string(v))
+
+	err = db.Delete([]byte("key6"))
+	if err != nil {
+		t.Log(err)
+	}
+	v, err = db.Get([]byte("key6"))
+	if err != nil {
+		t.Log(err)
+	}
+	t.Log(string(v))
 }

@@ -12,4 +12,8 @@ type Codec interface {
 	MarshalRecord(*model.Record) ([]byte, int64, error)
 
 	UnmarshalRecord([]byte, *model.RecordHeader, *model.Record) error
+
+	MarshalRecordPos(*model.RecordPos) ([]byte, error)
+
+	UnmarshalRecordPos([]byte, *model.RecordPos) error
 }

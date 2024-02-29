@@ -71,7 +71,7 @@ func (wb *WriteBatch) Delete(key []byte) error {
 	defer wb.mu.Unlock()
 
 	// if the data does not exist, return directly
-	recordPos := wb.db.options.keyDir.Get(key)
+	recordPos := wb.db.options.keydir.Get(key)
 	if recordPos == nil {
 		if wb.pendingWrites[string(key)] != nil {
 			delete(wb.pendingWrites, string(key))
@@ -135,9 +135,9 @@ func (wb *WriteBatch) Commit() error {
 	// update keydir
 	for _, record := range wb.pendingWrites {
 		if record.IsDelete {
-			wb.db.options.keyDir.Delete(record.Key)
+			wb.db.options.keydir.Delete(record.Key)
 		} else {
-			wb.db.options.keyDir.Put(record.Key, positions[string(record.Key)])
+			wb.db.options.keydir.Put(record.Key, positions[string(record.Key)])
 		}
 	}
 

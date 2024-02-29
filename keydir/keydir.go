@@ -4,6 +4,11 @@ import (
 	"github.com/cqkv/cqkv/model"
 )
 
+const (
+	BtreeTypeKeydir    = "btree"
+	SkipListTypeKeydir = "skiplist"
+)
+
 // Keydir defined the keydir interface
 // you can use some other data structure once you implement this interface
 // keydir should be concurrency-safe!!!
@@ -13,6 +18,7 @@ type Keydir interface {
 	Delete(key []byte) bool
 	Size() int
 	Iterator() Iterator
+	Close() error
 }
 
 type Iterator interface {

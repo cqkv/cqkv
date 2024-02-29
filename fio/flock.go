@@ -11,8 +11,8 @@ type FileLocker interface {
 	Unlock() error
 }
 
-const flockName = "flock"
+const FlockName = "flock"
 
 func NewFlock(dirPath string) *flock.Flock {
-	return flock.New(filepath.Join(dirPath, flockName))
+	return flock.New(filepath.Join(dirPath, FlockName))
 }

@@ -78,6 +78,11 @@ func (bt *BTree) Size() int {
 	return bt.tree.Len()
 }
 
+func (bt *BTree) Close() error {
+	bt.tree.Clear(false)
+	return nil
+}
+
 func (bt *BTree) Iterator() Iterator {
 	return bt.newBtreeIterator()
 }

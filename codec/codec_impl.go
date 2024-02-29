@@ -49,7 +49,11 @@ func (cl *CodecImpl) UnmarshalRecordHeader(headerData []byte, header *model.Reco
 	crc := binary.BigEndian.Uint32(headerData[:4])
 
 	// get isDelete
-	isDelete := headerData[4] == 1
+	var isDelete bool
+	switch headerData[4] {
+	case 1:
+		isDelete = true
+	}
 
 	// get key size and value size
 	idx := 5
@@ -79,5 +83,27 @@ func (cl *CodecImpl) UnmarshalRecord(data []byte, header *model.RecordHeader, re
 	kz, vz := header.KeySize, header.ValueSize
 	record.Key = data[:kz]
 	record.Value = data[kz : kz+vz]
+	return nil
+}
+
+func (cl *CodecImpl) MarshalRecordPos(pos *model.RecordPos) ([]byte, error) {
+	buf := make([]byte, binary.MaxVarintLen32*2+binary.MaxVarintLen64)
+	var index = 0
+	index += binary.PutVarint(buf[index:], int64(pos.Fid))
+	index += binary.PutVarint(buf[index:], pos.Offset)
+	index += binary.PutVarint(buf[index:], int64(pos.Size))
+	return buf[:index], nil
+}
+
+func (cl *CodecImpl) UnmarshalRecordPos(buf []byte, pos *model.RecordPos) error {
+	var index = 0
+	fileId, n := binary.Varint(buf[index:])
+	index += n
+	offset, n := binary.Varint(buf[index:])
+	index += n
+	size, _ := binary.Varint(buf[index:])
+	pos.Fid = uint32(fileId)
+	pos.Offset = offset
+	pos.Size = uint32(size)
 	return nil
 }

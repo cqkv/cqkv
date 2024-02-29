@@ -25,6 +25,8 @@ type DB struct {
 
 	txSeq uint64 // transaction sequence number
 
+	isMerging bool // whether is merging
+
 	options *options
 }
 
@@ -61,13 +63,14 @@ func newDB(dirPath string, o []Option) (*DB, error) {
 		}
 
 		// check whether current dir is used
-		success, err := ops.fileLock.TryLock()
+		// TODO: fix the file lock
+		_, err := ops.fileLock.TryLock()
 		if err != nil {
 			return nil, err
 		}
-		if !success {
-			return nil, ErrDirIsUsing
-		}
+		//if !success {
+		//	return nil, ErrDirIsUsing
+		//}
 
 		if _, err = os.ReadDir(dirPath); err != nil {
 			return nil, err
@@ -81,14 +84,20 @@ func newDB(dirPath string, o []Option) (*DB, error) {
 		options:    ops,
 	}
 
-	// TODO: load merge file
-
 	// load data files
+	if err := db.loadMergeFiles(); err != nil {
+		return nil, err
+	}
+
 	if err := db.loadDataFiles(); err != nil {
 		return nil, err
 	}
 
 	// load keydir
+	if err := db.loadKeydirFromHintFile(); err != nil {
+		return nil, err
+	}
+
 	if err := db.loadKeydirFromDataFiles(); err != nil {
 		return nil, err
 	}
@@ -101,9 +110,10 @@ func (db *DB) Put(key []byte, value []byte) error {
 		return ErrEmptyKey
 	}
 
+	key = addTxSeqPrefix(key, noTransactionSeq)
 	// append record in active data file
 	record := &model.Record{
-		Key:   addTxSeqPrefix(key, noTransactionSeq),
+		Key:   key,
 		Value: value,
 	}
 	pos, err := db.appendRecordWithLock(record)
@@ -111,7 +121,7 @@ func (db *DB) Put(key []byte, value []byte) error {
 		return err
 	}
 
-	if !db.options.keyDir.Put(key, pos) {
+	if !db.options.keydir.Put(key, pos) {
 		return ErrUpdateKeydir
 	}
 
@@ -124,7 +134,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	}
 
 	// get pos from keydir
-	pos := db.options.keyDir.Get(key)
+	pos := db.options.keydir.Get(addTxSeqPrefix(key, noTransactionSeq))
 	if pos == nil {
 		return nil, ErrNoRecord
 	}
@@ -151,8 +161,9 @@ func (db *DB) Delete(key []byte) error {
 		return nil
 	}
 
+	key = addTxSeqPrefix(key, noTransactionSeq)
 	// if key is not in keydir, return
-	if pos := db.options.keyDir.Get(key); pos == nil {
+	if pos := db.options.keydir.Get(key); pos == nil {
 		return nil
 	}
 
@@ -168,7 +179,7 @@ func (db *DB) Delete(key []byte) error {
 	}
 
 	// update keydir
-	ok := db.options.keyDir.Delete(key)
+	ok := db.options.keydir.Delete(key)
 	if !ok {
 		return ErrUpdateKeydir
 	}
@@ -178,7 +189,15 @@ func (db *DB) Delete(key []byte) error {
 
 func (db *DB) Close() error {
 	defer func() {
-		_ = db.options.fileLock.Unlock()
+		// release file lock
+		if err := db.options.fileLock.Unlock(); err != nil {
+			panic(err)
+		}
+
+		// release keydir
+		if err := db.options.keydir.Close(); err != nil {
+			panic(err)
+		}
 	}()
 
 	if db.activeFile == nil {
@@ -209,12 +228,12 @@ func (db *DB) Sync() error {
 	return db.activeFile.Sync()
 }
 
-func (db *DB) ListKey() [][]byte {
+func (db *DB) ListKeys() [][]byte {
 	// get iterator
-	iterator := db.options.keyDir.Iterator()
+	iterator := db.options.keydir.Iterator()
 	defer iterator.Close()
 
-	keys := make([][]byte, 0, db.options.keyDir.Size())
+	keys := make([][]byte, 0, db.options.keydir.Size())
 	// iterate keydir
 	for iterator.Rewind(); iterator.Valid(); iterator.Next() {
 		keys = append(keys, iterator.Key())
@@ -225,7 +244,7 @@ func (db *DB) ListKey() [][]byte {
 
 func (db *DB) Fold(handler func(key, value []byte) error) error {
 	// get iterator
-	iterator := db.options.keyDir.Iterator()
+	iterator := db.options.keydir.Iterator()
 	defer iterator.Close()
 
 	// iterate keydir
@@ -243,11 +262,6 @@ func (db *DB) Fold(handler func(key, value []byte) error) error {
 			return err
 		}
 	}
-	return nil
-}
-
-func (db *DB) Merge() error {
-	// TODO
 	return nil
 }
 
@@ -361,7 +375,8 @@ func (db *DB) setActiveDatafile() error {
 	}
 
 	var err error
-	dataFile.IoManager, err = db.options.ioManagerCreator(db.options.dirPath, initialFileId)
+
+	dataFile.IoManager, err = db.options.ioManagerCreator(model.GetDataFileName(db.options.dirPath, model.DataFileType, initialFileId))
 	if err != nil {
 		return err
 	}
@@ -458,7 +473,7 @@ func (db *DB) loadDataFiles() error {
 
 	for i, id := range fileIds {
 		// get io manager
-		ioManager, err := db.options.ioManagerCreator(dir, id)
+		ioManager, err := db.options.ioManagerCreator(model.GetDataFileName(dir, model.DataFileType, id))
 		if err != nil {
 			return err
 		}
@@ -483,8 +498,26 @@ func (db *DB) loadKeydirFromDataFiles() error {
 	transactionRecords := make(map[uint64]*model.Record)
 	curTxSeq := noTransactionSeq
 
+	// check whether current db has merged
+	hasMerged, nonMergeFid := false, uint32(0)
+	mergeFinishedFileName := model.GetDataFileName(db.options.dirPath, model.MergeFinishedFileType, 0)
+	if _, err := os.Stat(mergeFinishedFileName); err == nil {
+		fid, err := db.getNotMergeFid(db.options.dirPath)
+		if err != nil {
+			return err
+		}
+		hasMerged = true
+		hasMerged = true
+		nonMergeFid = fid
+	}
+
 	// get datafiles
 	for _, fid := range db.fileIds {
+		if hasMerged && fid < nonMergeFid {
+			// current data file's keydir has been loaded
+			continue
+		}
+
 		var dataFile *model.DataFile
 		if fid == db.activeFile.Fid {
 			dataFile = db.activeFile
@@ -520,9 +553,9 @@ func (db *DB) loadKeydirFromDataFiles() error {
 				// record may be deleted
 				var ok bool
 				if record.IsDelete {
-					ok = db.options.keyDir.Delete(record.Key)
+					ok = db.options.keydir.Delete(record.Key)
 				} else {
-					ok = db.options.keyDir.Put(record.Key, pos)
+					ok = db.options.keydir.Put(record.Key, pos)
 				}
 				if !ok {
 					return ErrUpdateKeydir
@@ -536,9 +569,9 @@ func (db *DB) loadKeydirFromDataFiles() error {
 						// record may be deleted
 						var ok bool
 						if txRecord.IsDelete {
-							ok = db.options.keyDir.Delete(txRecord.Key)
+							ok = db.options.keydir.Delete(txRecord.Key)
 						} else {
-							ok = db.options.keyDir.Put(txRecord.Key, pos)
+							ok = db.options.keydir.Put(txRecord.Key, pos)
 						}
 						if !ok {
 							return ErrUpdateKeydir
