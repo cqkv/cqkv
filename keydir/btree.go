@@ -2,11 +2,11 @@ package keydir
 
 import (
 	"bytes"
-	"sync"
-
+	"fmt"
 	"github.com/cqkv/cqkv/model"
-
 	"github.com/google/btree"
+	"sync"
+	"time"
 )
 
 var _ Keydir = (*BTree)(nil)
@@ -49,7 +49,10 @@ func (bt *BTree) Put(key []byte, value *model.RecordPos) bool {
 	}
 	bt.lock.Lock()
 	defer bt.lock.Unlock()
+	start := time.Now()
 	bt.tree.ReplaceOrInsert(item)
+	fmt.Println("btree put time:", time.Since(start))
+	fmt.Println()
 	return true
 }
 

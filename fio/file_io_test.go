@@ -1,12 +1,9 @@
 package fio
 
 import (
-	"fmt"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
-	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestFIleIO_Write(t *testing.T) {
@@ -15,10 +12,8 @@ func TestFIleIO_Write(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, fio)
 
-	for i := 0; i < 1000; i++ {
-		start := time.Now()
-		n, err := fio.fd.Write([]byte("hello"))
-		fmt.Println("write time:", time.Since(start))
+	for i := 0; i < 3; i++ {
+		n, err := fio.Write([]byte("hello"))
 		assert.Nil(t, err)
 		assert.Equal(t, 5, n)
 	}

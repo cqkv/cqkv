@@ -3,7 +3,9 @@ package benchmark
 import (
 	"errors"
 	"github.com/cqkv/cqkv"
+	"github.com/cqkv/cqkv/fio"
 	"github.com/stretchr/testify/assert"
+	"log"
 	"strconv"
 	"testing"
 )
@@ -54,5 +56,19 @@ func Benchmark_Delete(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		err := db.Delete([]byte("key" + strconv.Itoa(i)))
 		assert.Nil(b, err)
+	}
+}
+
+func Benchmark_IO(b *testing.B) {
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	dataFile, err := fio.NewFIleIO("./data")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for i := 0; i < b.N; i++ {
+		dataFile.Write([]byte("11111111111111111111"))
 	}
 }

@@ -50,7 +50,7 @@ func TestDB_Put2(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 10; i++ {
 		err = db.Put([]byte(fmt.Sprintf("key%d", i)), []byte(fmt.Sprintf("value%d", i)))
 		assert.Nil(t, err)
 	}

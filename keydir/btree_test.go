@@ -1,9 +1,8 @@
 package keydir
 
 import (
-	"testing"
-
 	"github.com/cqkv/cqkv/model"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -102,4 +101,16 @@ func TestBTree_Delete(t *testing.T) {
 
 	ok = bt.Delete([]byte("a"))
 	assert.Equal(t, false, ok)
+}
+
+func TestBtree_Put(t *testing.T) {
+	bt := NewBTree(32)
+	for i := 0; i < 5; i++ {
+		res := bt.Put([]byte{byte(i)}, &model.RecordPos{
+			Fid:    uint32(i),
+			Size:   uint32(i),
+			Offset: int64(i),
+		})
+		assert.True(t, res)
+	}
 }

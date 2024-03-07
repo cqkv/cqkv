@@ -3,6 +3,9 @@ package cqkv
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/cqkv/cqkv/fio"
+	"github.com/cqkv/cqkv/model"
+	"github.com/cqkv/cqkv/utils"
 	"io"
 	"os"
 	"reflect"
@@ -10,10 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/cqkv/cqkv/fio"
-	"github.com/cqkv/cqkv/model"
-	"github.com/cqkv/cqkv/utils"
 )
 
 type DB struct {
@@ -37,7 +36,7 @@ func Open(dirPath string, ops ...Option) (*DB, error) {
 
 func newDB(dirPath string, o []Option) (*DB, error) {
 	// create options
-	ops := defaultOptions
+	ops := newDefaultOptions()
 	if dirPath != "" {
 		ops.dirPath = dirPath
 	}

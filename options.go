@@ -25,16 +25,20 @@ type options struct {
 	fastOpen bool
 }
 
-var defaultOptions = &options{
-	dirPath:          os.TempDir(),
-	dataFileSize:     1024 * 1024 * 256, // 256mb
-	syncFre:          101,
-	ioManagerCreator: defaultIOManagerCreator,
-	codec:            codec.NewCodecImpl(),
-	keydir:           keydir.NewBTree(32),
-	keydirType:       keydir.BtreeTypeKeydir,
-	btreeDegree:      32,
+func newDefaultOptions() *options {
+	return &options{
+		dirPath:          os.TempDir(),
+		dataFileSize:     1024 * 1024 * 256, // 256mb
+		syncFre:          1024,
+		ioManagerCreator: defaultIOManagerCreator,
+		codec:            codec.NewCodecImpl(),
+		keydir:           keydir.NewBTree(32),
+		keydirType:       keydir.BtreeTypeKeydir,
+		btreeDegree:      32,
+	}
 }
+
+//var defaultOptions = &options{}
 
 type Option func(*options)
 

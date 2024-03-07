@@ -1,7 +1,9 @@
 package fio
 
 import (
+	"fmt"
 	"os"
+	"time"
 )
 
 // FileIO is the default implement for IOManager
@@ -21,6 +23,10 @@ func (fio *FileIO) Read(buf []byte, offset int64) (int, error) {
 	return fio.fd.ReadAt(buf, offset)
 }
 func (fio *FileIO) Write(data []byte) (int, error) {
+	start := time.Now()
+	defer func() {
+		fmt.Println("write time111:", time.Since(start))
+	}()
 	return fio.fd.Write(data)
 }
 func (fio *FileIO) Sync() error {
